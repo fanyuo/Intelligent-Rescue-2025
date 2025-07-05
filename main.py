@@ -26,7 +26,7 @@ from config import label_balls,label_areas,rescue_model
 stream = VideoStream()
 controller = Controller()
 model = YOLO(rescue_model) #<------------------------------模型文件修改此处
-#model.to('cuda:0')  # 使用GPU推理
+model.to('cuda:0')  # 使用GPU推理
 
 state: int = 0
 state_list=["执行寻找球","已找到球，执行抓球","已抓到球，执行寻找area","已找到area，执行放球和后续操作"]
