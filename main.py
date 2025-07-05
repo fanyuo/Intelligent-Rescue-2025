@@ -7,6 +7,7 @@
 # 创建日期: 2025-07-04
 # 修改记录:
 #   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
+#   2025-07-05 樊彧 优化了算法结构
 # -----------------------------------------------------------------------------
 """
 状态机说明:
@@ -19,14 +20,17 @@ state 3: 已找到area，执行放球和后续操作
 from ultralytics import YOLO
 import time
 from control import Controller
-from vison import VideoStream
-from vison import detect_closest_object,has_caught_ball,is_ball_in_area
-from config import label_balls,label_areas,rescue_model
+from vison import VideoStream,VISION
+from config import label_balls,label_areas,RESCUE_MODEL
+
+import cv2
+
+model = YOLO(str(RESCUE_MODEL))
+# model.to('cuda:0')  # 使用GPU推理
 
 stream = VideoStream()
 controller = Controller()
-model = YOLO(rescue_model) #<------------------------------模型文件修改此处
-model.to('cuda:0')  # 使用GPU推理
+vision=VISION(model,label_balls,label_areas)
 
 state: int = 0
 state_list=["执行寻找球","已找到球，执行抓球","已抓到球，执行寻找area","已找到area，执行放球和后续操作"]
@@ -47,16 +51,16 @@ while running:
 
         if frame_count % detect_interval == 0:
             results = model(frame)
-            flag_found_ball, ball_data = detect_closest_object(results, model, label_balls)
+            flag_found_ball, ball_data = vision.detect_closest_object(results,label_balls)
             # 解包ball_date 获取坐标数据等
 
             if flag_found_ball:
-                x, y = ball_data['center']
+                bcx, bcy = ball_data['center']
                 # 在爪子内，执行抓球
-                if 0<x<640 and y<480: # 坐标待定
+                if vision.is_ready_to_catch(bcx,bcy):
                     state=1
                 else:
-                    controller.approach_ball(x, y) #待写
+                    controller.approach_ball(bcx, bcy) #待写
             else:
                 controller.search_ball()   # 没找到球，旋转车体进行找球
 
@@ -70,7 +74,7 @@ while running:
         while time.time() - start_time < 1.0:  # 1秒超时检测
             frame = stream.read_frame()
             results = model(frame)
-            if has_caught_ball(results,model,label_balls):  # 成功检测到抓取
+            if vision.has_caught_ball(results):  # 成功检测到抓取
                 state = 2
                 break
             time.sleep(0.05)  # 短暂休眠避免CPU满载
@@ -81,16 +85,14 @@ while running:
     if state==2:
         if frame_count % detect_interval == 0:
             results = model(frame)
-            flag_found_area, area_data = detect_closest_object(results, model, label_areas)
+            flag_found_area, area_data = vision.detect_closest_object(results,label_areas)
             if flag_found_area:
-                x, y = area_data['center']
-                if is_ball_in_area(results,model):# 爪子的机械结构满足可以在不张开爪子的情况下直接将球推进安全区
+                acx, acy = area_data['center']
+                if vision.is_ball_in_area(results):# 爪子的机械结构满足可以在不张开爪子的情况下直接将球推进安全区
                     state=3
                     continue
-                if 0 < x < 640 and y < 480:  # 坐标待定
-                    state = 3
                 else:
-                    controller.approach_area(x,y)
+                    controller.approach_area(acx,acy)
                     # 执行找安全区
             else:
                 controller.search_area()  # 没找到球，旋转车体进行找球
@@ -104,3 +106,7 @@ while running:
         time.sleep(0.5) #参数待定
 
         state=0
+
+    # 显示和保存
+    stream.show_frame(frame)
+    stream.save_frame(frame)
