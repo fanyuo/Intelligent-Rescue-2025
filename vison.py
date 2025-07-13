@@ -8,6 +8,7 @@
 # 修改记录:
 #   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
 #   2025-07-05 樊彧 将视觉识别部分整合成类
+#   2025-07-14 樊彧 优化有效球的识别，添加安全区的识别
 # -----------------------------------------------------------------------------
 import cv2
 from typing import Tuple, Optional, Dict, Any, List
@@ -84,6 +85,9 @@ class VideoStream:
 
     def release(self):
         self.cap.release()
+        cv2.destroyAllWindows()
+        if self.save_output and self.writer:
+            self.writer.release()
 
     def __enter__(self):
         return self
@@ -98,7 +102,7 @@ class VISION:
             self,
             model,
             label_balls: List[str],
-            label_areas: List[str],
+            label_area: List[str],
             catch_area: Tuple[int, int, int, int] = CATCH_AREA,
             ready_area: Tuple[int, int, int, int] = READY_AREA,
             min_confidence: float = 0.5
@@ -106,17 +110,18 @@ class VISION:
 
         self.model = model
         self.label_balls = label_balls
-        self.label_areas = label_areas
+        self.label_area = label_area
         self.min_confidence = min_confidence
 
         # 初始化区域配置
         self.catch_area = catch_area
         self.ready_area = ready_area
 
-    def detect_closest_object(
+    def detect_closest_ball(
             self,
             results,
             labels: Optional[List[str]] = None,
+            validity = True,#是否检测安全区内的球
             min_confidence: Optional[float] = None
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
@@ -134,8 +139,61 @@ class VISION:
         labels = self.label_balls if labels is None else labels
         min_confidence = self.min_confidence if min_confidence is None else min_confidence
 
-        closest_target = None
+        area_box = None
+        if validity:
+            # 检查安全区是否存在
+            for result in results:
+                for box in result.boxes:
+                    conf = box.conf[0].item()
+                    cls = int(box.cls[0].item())
+                    label = self.model.names[cls]
+                    if label in self.label_area and conf > min_confidence:
+                        area_box = box
+
+        closest_ball = None
         max_area = 0  # 用面积作为距离代理（面积越大通常距离越近）
+        for result in results:
+            for box in result.boxes:
+                conf = box.conf[0].item()
+                cls = int(box.cls[0].item())
+                label = self.model.names[cls]
+
+                if label in labels and conf > min_confidence:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                    bcx=(x1+x2)/2
+                    bcy=(y1+y2)/2
+                    current_area = (x2 - x1) * (y2 - y1)
+
+                    if validity and area_box:
+                        area_x1, area_y1, area_x2, area_y2 = area_box.xyxy[0].cpu().numpy().tolist()
+                        in_area = (area_x1 < bcx < area_x2 and
+                                   area_y1 < bcy < area_y2)
+                        if in_area:
+                            continue
+
+                    # 只保留面积最大的目标（最近的）
+                    if current_area > max_area:
+                        max_area = current_area
+                        closest_ball = {
+                            'label': label,
+                            'coordinates': (x1, y1, x2, y2),
+                            'center': ((x1 + x2) / 2, (y1 + y2) / 2),
+                            'class_id': cls
+                        }
+
+        return closest_ball is not None, closest_ball
+
+    def detect_area(
+            self,
+            results,
+            labels: Optional[List[str]] = None,
+            min_confidence: Optional[float] = None
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+
+        labels = self.label_area if labels is None else labels
+        min_confidence = self.min_confidence if min_confidence is None else min_confidence
+
+        area_box = None
 
         for result in results:
             for box in result.boxes:
@@ -145,19 +203,15 @@ class VISION:
 
                 if label in labels and conf > min_confidence:
                     x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                    current_area = (x2 - x1) * (y2 - y1)
 
-                    # 只保留面积最大的目标（最近的）
-                    if current_area > max_area:
-                        max_area = current_area
-                        closest_target = {
-                            'label': label,
-                            'coordinates': (x1, y1, x2, y2),
-                            'center': ((x1 + x2) / 2, (y1 + y2) / 2),
-                            'class_id': cls
-                        }
+                    area_box = {
+                        'label': label,
+                        'coordinates': (x1, y1, x2, y2),
+                        'center': ((x1 + x2) / 2, (y1 + y2) / 2),
+                        'class_id': cls
+                    }
 
-        return closest_target is not None, closest_target
+        return area_box is not None, area_box
 
     def has_caught_ball(
             self,
@@ -179,7 +233,7 @@ class VISION:
         # 解包抓取区域坐标
         catch_x1, catch_y1, catch_x2, catch_y2 = self.catch_area
         labels = self.label_balls if labels is None else labels
-        conf_threshold = self.min_confidence if min_confidence is None else min_confidence
+        min_confidence = self.min_confidence if min_confidence is None else min_confidence
 
         for result in results:
             for box in result.boxes:
@@ -219,19 +273,22 @@ class VISION:
         """
         # 解包抓取区域坐标
         catch_x1, catch_y1, catch_x2, catch_y2 = self.catch_area
-        conf_threshold = self.min_confidence if min_confidence is None else min_confidence
+        min_confidence = self.min_confidence if min_confidence is None else min_confidence
 
         # 第一阶段：检查安全区是否存在
-        area_box = next(
-            (box for result in results for box in result.boxes
-             if self.model.names[int(box.cls[0].item())] in self.label_areas
-             and box.conf[0].item() > conf_threshold),
-            None
-        )
+        area_box = None
+
+        for result in results:
+            for box in result.boxes:
+                conf = box.conf[0].item()
+                cls = int(box.cls[0].item())
+                label = self.model.names[cls]
+                if label in self.label_area and conf > min_confidence:
+                    area_box=box
+
         if not area_box:
             return False
 
-        ## 解包安全区坐标
         area_x1, area_y1, area_x2, area_y2 = area_box.xyxy[0].cpu().numpy().tolist()
 
         # 第二阶段：检查球体位置
@@ -242,7 +299,7 @@ class VISION:
                 cls = int(box.cls[0].item())
                 label = self.model.names[cls]
 
-                if label in self.label_balls and conf > conf_threshold:
+                if label in self.label_balls and conf > min_confidence:
                     # 计算球体中心
                     ball_x1, ball_y1, ball_x2, ball_y2 = box.xyxy[0].cpu().numpy().tolist()
                     center_x, center_y = (ball_x1 + ball_x2) / 2, (ball_y1 + ball_y2) / 2

@@ -21,11 +21,11 @@ class Controller:
 
 
     #设置目标电机速度
-    def set_motor_speed(self,num, speed):
+    def _set_motor_speed(self,num, speed):
         pass
 
     #设置目标舵机速度
-    def set_servo_angle(self, num,angle):
+    def _set_servo_angle(self, num,angle):
         pass
 
     def forward(self,speed):
@@ -58,7 +58,7 @@ class Controller:
         pass#同上
 
     def search_ball(self):
-        pass#原地旋转以寻球
+        pass#原地旋转以寻球?
 
     def search_area(self):
         pass#原地旋转以寻安全区

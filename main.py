@@ -17,20 +17,19 @@ state 2: 已抓到球，执行寻找area
 state 3: 已找到area，执行放球和后续操作
 """
 
+import cv2
 from ultralytics import YOLO
 import time
 from control import Controller
 from vison import VideoStream,VISION
-from config import label_balls,label_areas,RESCUE_MODEL
-
-import cv2
+from config import label_balls,label_area,RESCUE_MODEL
 
 model = YOLO(str(RESCUE_MODEL))
 # model.to('cuda:0')  # 使用GPU推理
 
 stream = VideoStream()
 controller = Controller()
-vision=VISION(model,label_balls,label_areas)
+vision=VISION(model,label_balls,label_area)
 
 state: int = 0
 state_list=["执行寻找球","已找到球，执行抓球","已抓到球，执行寻找area","已找到area，执行放球和后续操作"]
@@ -41,17 +40,25 @@ frame_count = 0
 detect_interval = 1  # 每x帧进行一次检测
 results = None  # 存储模型检测结果
 running=True
+last_time = time.time()
+
+
 while running:
-    print(f"当前State：{state_list[state]}")
     # 读取帧
     frame = stream.read_frame()
     frame_count += 1
+
+    # 每0.5s打印一次当前状态
+    if (current_time := time.time()) > last_time + 0.5:
+        last_time=current_time
+        print(f"第{frame_count}次运行，当前状态：{state_list[state]}")
+
     # 执行寻找球
     if state==0:
 
         if frame_count % detect_interval == 0:
-            results = model(frame)
-            flag_found_ball, ball_data = vision.detect_closest_object(results,label_balls)
+            results = model(frame,verbose=False)
+            flag_found_ball, ball_data = vision.detect_closest_ball(results,label_balls)
             # 解包ball_date 获取坐标数据等
 
             if flag_found_ball:
@@ -73,7 +80,7 @@ while running:
         start_time = time.time()
         while time.time() - start_time < 1.0:  # 1秒超时检测
             frame = stream.read_frame()
-            results = model(frame)
+            results = model(frame,verbose=False)
             if vision.has_caught_ball(results):  # 成功检测到抓取
                 state = 2
                 break
@@ -84,8 +91,8 @@ while running:
     # 已抓到球，执行寻找area
     if state==2:
         if frame_count % detect_interval == 0:
-            results = model(frame)
-            flag_found_area, area_data = vision.detect_closest_object(results,label_areas)
+            results = model(frame,verbose=False)
+            flag_found_area, area_data = vision.detect_area(results)
             if flag_found_area:
                 acx, acy = area_data['center']
                 if vision.is_ball_in_area(results):# 爪子的机械结构满足可以在不张开爪子的情况下直接将球推进安全区
@@ -102,7 +109,7 @@ while running:
         controller.release()
         time.sleep(0.5) #参数待定
 
-        controller.backward(10) #参数待定
+        controller.backward(speed=10) #参数待定
         time.sleep(0.5) #参数待定
 
         state=0
@@ -110,3 +117,8 @@ while running:
     # 显示和保存
     stream.show_frame(frame)
     stream.save_frame(frame)
+    if cv2.waitKey(1) == ord('q'):
+        break
+
+
+stream.release()
