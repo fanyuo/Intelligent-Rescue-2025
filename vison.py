@@ -103,8 +103,8 @@ class VISION:
             model,
             label_balls: List[str],
             label_area: List[str],
-            catch_area: Tuple[int, int, int, int] = CATCH_AREA,
-            ready_area: Tuple[int, int, int, int] = READY_AREA,
+            catch_area: Tuple[int, int, int, int] = CATCH_AREA, # 去config.py里调整，不要在这里调整
+            ready_area: Tuple[int, int, int, int] = READY_AREA, # 去config.py里调整，不要在这里调整
             min_confidence: float = 0.5
     ):
 
@@ -121,7 +121,7 @@ class VISION:
             self,
             results,
             labels: Optional[List[str]] = None,
-            validity = True,#是否检测安全区内的球
+            validity = True, # 是否检测安全区内的球
             min_confidence: Optional[float] = None
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
@@ -138,6 +138,8 @@ class VISION:
         """
         labels = self.label_balls if labels is None else labels
         min_confidence = self.min_confidence if min_confidence is None else min_confidence
+        closest_ball = None
+        max_area = 0  # 用面积作为距离代理（面积越大通常距离越近）
 
         area_box = None
         if validity:
@@ -150,36 +152,39 @@ class VISION:
                     if label in self.label_area and conf > min_confidence:
                         area_box = box
 
-        closest_ball = None
-        max_area = 0  # 用面积作为距离代理（面积越大通常距离越近）
         for result in results:
             for box in result.boxes:
                 conf = box.conf[0].item()
                 cls = int(box.cls[0].item())
                 label = self.model.names[cls]
 
-                if label in labels and conf > min_confidence:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                    bcx=(x1+x2)/2
-                    bcy=(y1+y2)/2
-                    current_area = (x2 - x1) * (y2 - y1)
+                # 跳过非目标标签或低置信度检测
+                if label not in labels or conf < min_confidence:
+                    continue
 
-                    if validity and area_box:
-                        area_x1, area_y1, area_x2, area_y2 = area_box.xyxy[0].cpu().numpy().tolist()
-                        in_area = (area_x1 < bcx < area_x2 and
-                                   area_y1 < bcy < area_y2)
-                        if in_area:
-                            continue
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+                current_area = (x2 - x1) * (y2 - y1)
 
-                    # 只保留面积最大的目标（最近的）
-                    if current_area > max_area:
-                        max_area = current_area
-                        closest_ball = {
-                            'label': label,
-                            'coordinates': (x1, y1, x2, y2),
-                            'center': ((x1 + x2) / 2, (y1 + y2) / 2),
-                            'class_id': cls
-                        }
+                if validity and area_box:
+                    area_x1, area_y1, area_x2, area_y2 = area_box.xyxy[0].cpu().numpy().tolist()
+                    # 检查四个角点是否都在安全区内
+                    corners_inside = False
+                    for x, y in [(x1, y1), (x2, y1), (x1, y2), (x2, y2)]:
+                        if area_x1 <= x <= area_x2 and area_y1 <= y <= area_y2:
+                            corners_inside += 1
+                    # 如果全部四个角点都在安全区内，则跳过
+                    if corners_inside == 4:
+                        continue
+
+                # 更新最近球体信息
+                if current_area > max_area:
+                    max_area = current_area
+                    closest_ball = {
+                        'label': label,
+                        'coordinates': (x1, y1, x2, y2),
+                        'center': ((x1 + x2) / 2, (y1 + y2) / 2),
+                        'class_id': cls
+                    }
 
         return closest_ball is not None, closest_ball
 
@@ -256,7 +261,8 @@ class VISION:
                         return True
         return False
 
-    def is_ball_in_area(
+    # 此方法不靠谱，考虑以下方案：只推球不考虑是否推进去
+    def is_ready_to_release(
             self,
             results,
             min_confidence: Optional[float] = None

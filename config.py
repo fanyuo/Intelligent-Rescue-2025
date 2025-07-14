@@ -26,10 +26,17 @@ VIDEO_CODEC: str = "mp4v"  # 视频编码格式
 DEFAULT_FPS: int = 30  # 默认帧率
 DEFAULT_RESOLUTION: Tuple[int, int] = (640, 480)  # 默认分辨率
 
-#区域坐标设置
-CATCH_AREA: Tuple[int, int, int, int]=[]
-READY_AREA: Tuple[int, int, int, int]=[]
+# 区域坐标设置 -----------------------------> x1 y1 x2 y2
+CATCH_AREA: Tuple[int, int, int, int] = (180, 320, 460, 480)
+READY_AREA: Tuple[int, int, int, int] = (160, 320, 480, 480)
 
+# 舵机角度设置 ----------------> 舵机1和2的角度
+CATCH_ANGLE: Tuple[int, int] = (10,10)
+RELEASE_ANGLE: Tuple[int, int] = (20,20)
+
+# 串口设备口
+#UART_PORT: str = "/dev/ttyUSB0"
+UART_PORT: str = "COM4"
 
 # ==================== 内部数据处理 ====================
 _origin_label_balls = ["red_ball", "blue_ball", "yellow_ball", "black_ball"]
