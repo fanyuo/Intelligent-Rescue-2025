@@ -136,8 +136,11 @@ class VideoStream:
                     thickness=rect_thickness
                 )
 
+                # 获取类别名称（兼容不同YOLO版本）
+                class_name = results[0].names[cls_id]
+
                 # 绘制标签和置信度
-                label = f"{cls_id}: {conf:.2f}" if show_confidence else f"{cls_id}"
+                label = f"{class_name}: {conf:.2f}" if show_confidence else class_name
                 cv2.putText(
                     display_frame,
                     label,
@@ -447,4 +450,3 @@ def main_yolo():
 if __name__ == '__main__':
     main_yolo()
 
-    
