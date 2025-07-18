@@ -78,6 +78,12 @@ class Controller(UARTController):
         self.execute()
         time.sleep(0.3)  # 等待动作完成
 
+    def approach_ball(self,x,y) -> None:
+        pass
+
+    def approach_area(self,x,y) -> None:
+        pass
+
     def search_ball(self, speed = 30) -> None:
         """搜索球体"""
         self.left(speed)
