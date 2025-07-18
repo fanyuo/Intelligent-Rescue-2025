@@ -42,7 +42,7 @@ UART_PORT: str = "/dev/ttyUSB0"
 _origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"]
 _origin_label_area = ["Blue_Placement_Zone", "Red_Placement_Zone"]
 
-_ball_filter = {"blue": "red_ball", "red": "blue_ball"}
+_ball_filter = {"blue": "Red_Ball", "red": "Blue_Ball"}
 _area_filter = {"blue": "Red_Placement_Zone", "red": "Blue_Placement_Zone"}
 
 label_balls = [x for x in _origin_label_balls if x != _ball_filter.get(TEAM, "")]
