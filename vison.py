@@ -9,6 +9,7 @@
 #   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
 #   2025-07-05 樊彧 将视觉识别部分整合成类
 #   2025-07-14 樊彧 优化有效球的识别，添加安全区的识别
+#   2025-07-18 樊彧 增加检测框绘制
 # -----------------------------------------------------------------------------
 import cv2
 from typing import Tuple, Optional, Dict, Any, List
@@ -51,7 +52,8 @@ class VideoStream:
         # 初始化视频写入器
         self.writer = self._init_video_writer(width, height) if self.save_output else None
 
-    def _init_video_writer(self, width: int, height: int) -> cv2.VideoWriter:
+    @staticmethod
+    def _init_video_writer(width: int, height: int) -> cv2.VideoWriter:
         """初始化视频写入器"""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         output_path = Path(VIDEO_OUTPUT_DIR) / f"output_{timestamp}.mp4"
@@ -76,8 +78,79 @@ class VideoStream:
             raise RuntimeError("视频流读取失败")
         return frame
 
-    def show_frame(self, frame: np.ndarray):
-        cv2.imshow(self.window_name, frame)
+    @staticmethod
+    def show_frame(
+            frame: np.ndarray,
+            results: List[Any],  # 根据实际结果类型替换Any
+            *,
+            draw_rect: bool = True,
+            confidence_threshold: float = 0.5,
+            window_name: str = "Detection",
+            rect_color: Tuple[int, int, int] = (0, 255, 0),
+            rect_thickness: int = 2,
+            show_confidence: bool = True,
+            font_scale: float = 0.6
+    ) -> None:
+        """
+        显示带检测结果的帧画面（支持多种绘制选项）
+
+        参数:
+            frame: 输入图像帧 (BGR格式)
+            results: 检测结果列表
+            draw_rect: 是否绘制检测框 (默认True)
+            confidence_threshold: 置信度阈值 (默认0.5)
+            window_name: 显示窗口名称 (默认"Detection")
+            rect_color: 框线颜色 (BGR格式，默认绿色)
+            rect_thickness: 框线粗细 (像素，默认2)
+            show_confidence: 是否显示置信度 (默认True)
+            font_scale: 字体大小 (默认0.6)
+
+        返回:
+            None: 直接显示图像窗口
+        """
+        display_frame = frame.copy()
+
+        if draw_rect and results:
+            boxes = []
+            confidences = []
+            class_ids = []
+
+            # 提取有效检测结果
+            for r in results:
+                for box in r.boxes:
+                    conf = box.conf.item()
+                    if conf > confidence_threshold:
+                        boxes.append(box.xyxy[0].cpu().numpy().astype(int))
+                        confidences.append(conf)
+                        class_ids.append(int(box.cls.item()))
+
+            # 绘制检测框和标签
+            for box, conf, cls_id in zip(boxes, confidences, class_ids):
+                x1, y1, x2, y2 = box
+
+                # 绘制矩形框
+                cv2.rectangle(
+                    display_frame,
+                    (x1, y1), (x2, y2),
+                    color=rect_color,
+                    thickness=rect_thickness
+                )
+
+                # 绘制标签和置信度
+                label = f"{cls_id}: {conf:.2f}" if show_confidence else f"{cls_id}"
+                cv2.putText(
+                    display_frame,
+                    label,
+                    (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    font_scale,
+                    rect_color,
+                    max(1, int(font_scale * 2))
+                )
+
+        # 显示图像
+        cv2.imshow(window_name, display_frame)
+        cv2.waitKey(1)  # 允许图像窗口更新
 
     def save_frame(self, frame: np.ndarray):
         if self.save_output and self.writer:
