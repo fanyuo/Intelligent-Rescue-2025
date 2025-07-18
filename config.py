@@ -17,7 +17,7 @@ from typing import Dict, List, Literal,Tuple
 # ==================== 用户可配置参数 ====================
 # 队伍配置
 TEAM: str = ["blue", "red"][0]  # 当前队伍（默认选第一个）
-RESCUE_MODEL = "./models/322.pt"             # 模型文件路径
+RESCUE_MODEL = "./models/524.pt"             # 模型文件路径
 
 # 视频输出配置
 VIDEO_OUTPUT_DIR="./videos" # 视频保存目录
@@ -35,15 +35,15 @@ CATCH_ANGLE: Tuple[int, int] = (10,10)
 RELEASE_ANGLE: Tuple[int, int] = (90,90)
 
 # 串口设备口
-#UART_PORT: str = "/dev/ttyUSB0"
-UART_PORT: str = "COM9"
+UART_PORT: str = "/dev/ttyUSB0"
+#UART_PORT: str = "COM9"
 
 # ==================== 内部数据处理 ====================
-_origin_label_balls = ["red_ball", "blue_ball", "yellow_ball", "black_ball"]
-_origin_label_area = ["blue_area", "red_area"]
+_origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"]
+_origin_label_area = ["Blue_Placement_Zone", "Red_Placement_Zone"]
 
 _ball_filter = {"blue": "red_ball", "red": "blue_ball"}
-_area_filter = {"blue": "red_area", "red": "blue_area"}
+_area_filter = {"blue": "Red_Placement_Zone", "red": "Blue_Placement_Zone"}
 
 label_balls = [x for x in _origin_label_balls if x != _ball_filter.get(TEAM, "")]
 label_area = [x for x in _origin_label_area if x != _area_filter.get(TEAM, "")]
