@@ -49,6 +49,9 @@ while running:
     frame = stream.read_frame()
     frame_count += 1
 
+    if frame_count % detect_interval == 0:
+        results = model(frame, verbose=False)
+
     # 每0.5s打印一次当前状态
     if (current_time := time.time()) > last_time + 0.5:
         last_time=current_time
@@ -56,29 +59,26 @@ while running:
 
     # 执行寻找球
     if state==0:
+        flag_found_ball, ball_data = vision.detect_closest_ball(results,label_balls)
 
-        if frame_count % detect_interval == 0:
-            results = model(frame,verbose=False)
-            flag_found_ball, ball_data = vision.detect_closest_ball(results,label_balls)
+        if flag_found_ball:
+            if not last_flag_found_ball:
+                last_flag_found_ball=True
+                controller.stop()
+
             # 解包ball_date 获取坐标数据等
-
-            if flag_found_ball:
-                if not last_flag_found_ball:
-                    last_flag_found_ball=True
-                    controller.stop()
-
-                bcx, bcy = ball_data['center']
-                # 在爪子内，执行抓球
-                if vision.is_ready_to_catch(bcx,bcy):
-                    state=1
-                else:
-                    controller.approach_ball(bcx, bcy) #待写
+            bcx, bcy = ball_data['center']
+            # 在爪子内，执行抓球
+            if vision.is_ready_to_catch(bcx,bcy):
+                state=1
             else:
-                controller.search_ball(speed=10)   # 没找到球，旋转车体进行找球
-                last_flag_found_ball=False
+                controller.approach_ball(bcx, bcy) #待写
+        else:
+            controller.search_ball(speed=10)   # 没找到球，旋转车体进行找球
+            last_flag_found_ball=False
 
     # 已找到球，执行抓球
-    elif state==1:
+    if state==1:
         # 球已在抓取范围内，执行抓取动作
         controller.catch()
 
@@ -96,19 +96,18 @@ while running:
 
     # 已抓到球，执行寻找area
     if state==2:
-        if frame_count % detect_interval == 0:
-            results = model(frame,verbose=False)
-            flag_found_area, area_data = vision.detect_area(results)
-            if flag_found_area:
-                acx, acy = area_data['center']
-                if vision.is_ready_to_release(results):# 爪子的机械结构满足可以在不张开爪子的情况下直接将球推进安全区
-                    state=3
-                    continue
-                else:
-                    controller.approach_area(acx,acy)
-                    # 执行找安全区
+        flag_found_area, area_data = vision.detect_area(results)
+
+        if flag_found_area:
+            acx, acy = area_data['center']
+            if vision.is_ready_to_release(results): # 爪子的机械结构满足可以在不张开爪子的情况下直接将球推进安全区
+                state=3
+                continue
             else:
-                controller.search_area(speed=10)  # 没找到球，旋转车体进行找球
+                controller.approach_area(acx,acy)
+        # 执行找安全区
+        else:
+            controller.search_area(speed=10)  # 没找到球，旋转车体进行找球
 
     # 已到达area，执行放球和后续操作
     if state==3:
@@ -121,10 +120,11 @@ while running:
         state=0
 
     # 显示和保存
-    stream.show_frame(frame)
+    stream.show_frame(frame,results,draw_rect=True)
     stream.save_frame(frame)
     if cv2.waitKey(1) == ord('q'):
         break
 
 
 stream.release()
+controller.close()
