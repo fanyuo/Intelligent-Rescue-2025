@@ -32,11 +32,11 @@ READY_AREA: Tuple[int, int, int, int] = (160, 320, 480, 480)
 
 # 舵机角度设置 ----------------> 舵机1和2的角度
 CATCH_ANGLE: Tuple[int, int] = (10,10)
-RELEASE_ANGLE: Tuple[int, int] = (20,20)
+RELEASE_ANGLE: Tuple[int, int] = (90,90)
 
 # 串口设备口
 #UART_PORT: str = "/dev/ttyUSB0"
-UART_PORT: str = "COM4"
+UART_PORT: str = "COM9"
 
 # ==================== 内部数据处理 ====================
 _origin_label_balls = ["red_ball", "blue_ball", "yellow_ball", "black_ball"]

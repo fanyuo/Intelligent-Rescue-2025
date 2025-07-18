@@ -7,6 +7,7 @@
 # 创建日期: 2025-07-05
 # 修改记录:
 #   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
+#   2025-07-18 v1.0.0 初始版本 重构，增加缓冲区
 # -----------------------------------------------------------------------------
 from uart import UARTController
 import time
@@ -35,32 +36,38 @@ class Controller(UARTController):
         """前进"""
         self.set_motor_speed(1, speed)
         self.set_motor_speed(2, speed)
+        self.execute()
 
     def backward(self, speed: int = 50) -> None:
         """后退"""
         self.set_motor_speed(1, -speed)
         self.set_motor_speed(2, -speed)
+        self.execute()
 
     def left(self, speed: int = 30) -> None:
         """左转"""
         self.set_motor_speed(1, speed)
         self.set_motor_speed(2, -speed)
+        self.execute()
 
     def right(self, speed: int = 30) -> None:
         """右转"""
         self.set_motor_speed(1, -speed)
         self.set_motor_speed(2, speed)
+        self.execute()
 
     def stop(self) -> None:
         """停止所有电机"""
         self.set_motor_speed(1, 0)
         self.set_motor_speed(2, 0)
+        self.execute()
 
     # 舵机爪子张开和闭合的角度去config.py里调整，不要在这里调整
     def catch(self, angle1 = CATCH_ANGLE[0], angle2 = CATCH_ANGLE[1]) -> None:
         """执行抓取动作"""
         self.set_servo_angle(1, angle1)
         self.set_servo_angle(2, angle2)
+        self.execute()
         time.sleep(0.3)  # 等待动作完成
 
     # 舵机爪子张开和闭合的角度去config.py里调整，不要在这里调整
@@ -68,6 +75,7 @@ class Controller(UARTController):
         """执行释放动作"""
         self.set_servo_angle(1, angle1)
         self.set_servo_angle(2, angle2)
+        self.execute()
         time.sleep(0.3)  # 等待动作完成
 
     def search_ball(self, speed = 30) -> None:
@@ -88,25 +96,27 @@ def main1():
     controller = Controller()
     time.sleep(1)
 
-    controller.forward(20)
-    time.sleep(1)
+    controller.forward(50)
+    time.sleep(3)
     controller.stop()
-    time.sleep(0.3)
+    time.sleep(1)
 
-    controller.backward(20)
-    time.sleep(1)
+    controller.backward(50)
+    time.sleep(3)
     controller.stop()
-    time.sleep(0.3)
+    time.sleep(1)
 
-    controller.left(20)
-    time.sleep(1)
+    controller.left(50)
+    time.sleep(3)
     controller.stop()
-    time.sleep(0.3)
+    time.sleep(1)
 
-    controller.right(20)
-    time.sleep(1)
+    controller.right(50)
+    time.sleep(3)
     controller.stop()
-    time.sleep(0.3)
+    time.sleep(1)
+
+    controller.close()
 
 # 舵机测试
 def main2():
@@ -121,6 +131,8 @@ def main2():
     time.sleep(1)
     controller.release()
     time.sleep(1)
+
+    controller.close()
 
 if __name__ == '__main__':
     main1()
