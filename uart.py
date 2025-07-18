@@ -15,6 +15,7 @@ import serial
 from serial.serialutil import SerialException
 import threading
 from typing import Optional, List
+import time
 
 class UARTController:
     def __init__(self):
@@ -23,19 +24,38 @@ class UARTController:
         self._servo_angles = [0, 0]  # 舵机角度 [0, 360]
         self._lock = threading.Lock()
 
+    def _initialize_state(self):
+        """初始化硬件状态"""
+        self.set_motor_speed(1,0)
+        self.set_motor_speed(2,0)
+        self.set_servo_angle(1,0)
+        self.set_servo_angle(2,0)
+        self.execute()
+        time.sleep(0.5)  # 确保硬件响应
+
+    def _init_uart(self, serial_port: str, baudrate: int = 115200) -> None:
+        """初始化串口连接"""
+        with self._lock:
+            # 关闭已有连接（如果存在）
+            if hasattr(self, '_serial_port') and self._serial_port.is_open:
+                self._serial_port.close()
+
+            # 创建新连接
+            self._serial_port = serial.Serial(
+                port=serial_port,
+                baudrate=baudrate,
+                bytesize=serial.EIGHTBITS,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.5
+            )
+            print(f"UART 已初始化: {serial_port}@{baudrate}bps")
+
     def init_uart(self, serial_port: str, baudrate: int = 115200) -> None:
         """初始化串口连接（失败时抛出异常）"""
         try:
-            with self._lock:
-                self._serial_port = serial.Serial(
-                    port=serial_port,
-                    baudrate=baudrate,
-                    bytesize=serial.EIGHTBITS,
-                    parity=serial.PARITY_NONE,
-                    stopbits=serial.STOPBITS_ONE,
-                    timeout=0.5
-                )
-                print(f"UART 已初始化: {serial_port}@{baudrate}bps")
+            self._init_uart(serial_port, baudrate)
+            self._initialize_state()
         except SerialException as e:
             raise RuntimeError(f"UART初始化失败: {e}") from e
 

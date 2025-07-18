@@ -10,7 +10,11 @@
 #   2025-07-18 v1.0.0 初始版本 重构，增加缓冲区
 # -----------------------------------------------------------------------------
 from uart import UARTController
+import signal
 import time
+import sys
+from types import FrameType
+from typing import Optional
 from config import CATCH_ANGLE,RELEASE_ANGLE,UART_PORT
 
 class Controller(UARTController):
@@ -25,12 +29,67 @@ class Controller(UARTController):
         super().__init__()
         self.port = port
         self.baudrate = baudrate
-        self.init_uart(self.port,self.baudrate)
 
-        # 初始化状态
+        # 正确的信号处理器注册（Python 3.8+ 类型注解）
+        signal.signal(
+            signal.SIGINT,
+            self._signal_handler  # type: ignore[arg-type]
+        )
+        signal.signal(
+            signal.SIGTERM,
+            self._signal_handler  # type: ignore[arg-type]
+        )
+
+        try:
+            self._init_uart(self.port, self.baudrate)
+            self._initialize_state()
+        except Exception as e:
+            self._safe_shutdown()
+            raise RuntimeError(f"初始化失败: {e}")
+
+
+    def _initialize_state(self) -> None:
+        """初始化硬件状态"""
         self.stop()  # 停止所有电机
         self.release()  # 复位舵机
-        time.sleep(0.1)  # 确保硬件响应
+        time.sleep(0.3)  # 确保硬件响应
+
+    def _signal_handler(
+            self,
+            signum: int,
+            frame: Optional[FrameType]
+    ) -> None:
+        """
+        类型正确的信号处理器
+
+        参数:
+            signum: 信号编号 (如signal.SIGINT)
+            frame: 当前堆栈帧
+        """
+        print(f"\n捕获信号 {signal.Signals(signum).name}", end="")
+        self._safe_shutdown()
+        sys.exit(1)
+
+    def _safe_shutdown(self):
+        """安全关闭流程 (自动调用)"""
+        print("\n执行安全复位协议...")
+        try:
+            # 1. 停止所有电机
+            self.stop()
+            # 2. 复位舵机
+            self.release()
+            # 4. 关闭串口
+            if hasattr(self, '_serial_port') and self._serial_port.is_open:
+                self._serial_port.close()
+                print("串口连接已安全关闭")
+        except Exception as e:
+            print(f"安全关闭时出错: {e}")
+        finally:
+            print("硬件复位完成")
+
+    def __del__(self):
+        """对象销毁时自动复位"""
+        self._safe_shutdown()
 
     def forward(self, speed: int = 50) -> None:
         """前进"""
