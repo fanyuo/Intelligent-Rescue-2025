@@ -406,3 +406,45 @@ class VISION:
         """
         ready_x1, ready_y1, ready_x2, ready_y2 = self.ready_area
         return ready_x1 <= x <= ready_x2 and ready_y1 <= y <= ready_y2
+
+
+# ===================== 测试程序 =====================
+
+def main_yolo():
+    import cv2
+    from ultralytics import YOLO
+    from config import RESCUE_MODEL
+
+    model = YOLO(str(RESCUE_MODEL))
+    # model.to('cuda:0')  # 使用GPU推理
+    stream = VideoStream()
+
+    # 初始化参数
+    frame_count = 0
+    detect_interval = 1  # 每x帧进行一次检测
+    results = None  # 存储模型检测结果
+
+    while True:
+        try:
+            # 读取帧
+            frame = stream.read_frame()
+            frame_count += 1
+
+            if frame_count % detect_interval == 0:
+                results = model(frame, verbose=False)
+
+            # 显示和保存
+            stream.show_frame(frame, results, draw_rect=True)
+            stream.save_frame(frame)
+            if cv2.waitKey(1) == ord('q'):
+                break
+
+        except KeyboardInterrupt:
+            break
+
+    stream.release()
+
+if __name__ == '__main__':
+    main_yolo()
+
+    
