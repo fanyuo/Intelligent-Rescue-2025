@@ -33,23 +33,23 @@ class UARTController:
         self.execute()
         time.sleep(0.5)  # 确保硬件响应
 
-    def _init_uart(self, serial_port: str, baudrate: int = 115200) -> None:
-        """初始化串口连接"""
+    def _init_uart(self, serial_port: str, baudrate: int) -> None:
+        """内部串口初始化方法"""
         with self._lock:
-            # 关闭已有连接（如果存在）
-            if hasattr(self, '_serial_port') and self._serial_port.is_open:
-                self._serial_port.close()
-
-            # 创建新连接
-            self._serial_port = serial.Serial(
-                port=serial_port,
-                baudrate=baudrate,
-                bytesize=serial.EIGHTBITS,
-                parity=serial.PARITY_NONE,
-                stopbits=serial.STOPBITS_ONE,
-                timeout=0.5
-            )
-            print(f"UART 已初始化: {serial_port}@{baudrate}bps")
+            # 建立新连接
+            try:
+                self._serial_port = serial.Serial(
+                    port=serial_port,
+                    baudrate=baudrate,
+                    bytesize=serial.EIGHTBITS,
+                    parity=serial.PARITY_NONE,
+                    stopbits=serial.STOPBITS_ONE,
+                    timeout=0.5
+                )
+                print(f"UART 已连接: {serial_port}@{baudrate}bps")
+            except Exception as e:
+                self._serial_port = None
+                raise RuntimeError(f"串口初始化失败: {e}")
 
     def init_uart(self, serial_port: str, baudrate: int = 115200) -> None:
         """初始化串口连接（失败时抛出异常）"""
@@ -153,7 +153,7 @@ class UARTController:
 
 # ==============================测试程序==============================
 def main1():
-    packet = UARTController._build_pack(20,20,100,100)
+    packet = UARTController._build_pack(50,-50,100,100)
     print("数据包:\n", packet.hex(' ').upper())
 
 def main2():
@@ -308,9 +308,19 @@ def main2():
 
                 except KeyboardInterrupt:
                     print("\n正在中断操作...")
-                    continue
+                    # 退出前安全处理
+                    print("\n正在复位所有设备...")
+                    for mid in [1, 2]:
+                        controller.set_motor_speed(mid, 0)
+                    for sid in [1, 2]:
+                        controller.set_servo_angle(sid, 0)
+                    controller.execute()
+                    controller.close()
+                    print("程序已退出")
+                    return  # 完全退出程序
 
     main_menu()
 
 if __name__ == '__main__':
+    # main1()
     main2()

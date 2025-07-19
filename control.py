@@ -31,6 +31,7 @@ class Controller(UARTController):
         self._serial_port = None  # 显式初始化
 
         # 注册安全钩子
+        self.flag_cleanup = False
         signal.signal(signal.SIGINT, self._emergency_stop)
         signal.signal(signal.SIGTERM, self._emergency_stop)
         atexit.register(self._safe_shutdown)
@@ -42,7 +43,6 @@ class Controller(UARTController):
             self._safe_shutdown()  # 清理可能残留的状态
             raise RuntimeError(f"初始化失败: {e}") from e
 
-
     def _initialize_state(self) -> None:
         """初始化硬件状态"""
         self.stop()  # 停止所有电机
@@ -51,6 +51,9 @@ class Controller(UARTController):
 
     def _safe_shutdown(self) -> None:
         """线程安全的关闭方法"""
+        if self.flag_cleanup:
+            return
+        self.flag_cleanup=True
         print("\n执行安全复位协议...")
         try:
             # 1. 停止电机（不依赖串口状态）
@@ -79,6 +82,10 @@ class Controller(UARTController):
 
     def __del__(self):
         """对象销毁时自动复位"""
+        self._safe_shutdown()
+
+    def close(self) -> None:
+        super().close()
         self._safe_shutdown()
 
     def forward(self, speed: int = 50) -> None:
@@ -148,46 +155,58 @@ class Controller(UARTController):
 
 # 电机测试
 def main1():
+    print("开始测试电机")
     controller = Controller()
     time.sleep(1)
 
+    print("前进")
     controller.forward(50)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
+    print("后退")
     controller.backward(50)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
+    print("左转")
     controller.left(50)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
+    print("右转")
     controller.right(50)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
     controller.close()
+    print("电机测试完毕\n")
 
 # 舵机测试
 def main2():
+    print("开始测试舵机")
     controller = Controller()
     time.sleep(1)
 
+    print("爪子闭合")
     controller.catch()
     time.sleep(1)
+    print("爪子张开")
     controller.release()
     time.sleep(1)
+    print("爪子闭合")
     controller.catch()
     time.sleep(1)
+    print("爪子张开")
     controller.release()
     time.sleep(1)
 
     controller.close()
+    print("舵机测试完毕\n")
 
 if __name__ == '__main__':
     main1()
