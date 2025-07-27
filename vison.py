@@ -84,26 +84,16 @@ class VideoStream:
             results: List[Any],  # 根据实际结果类型替换Any
             *,
             draw_rect: bool = True,
-            confidence_threshold: float = 0.5,
             window_name: str = "Detection",
-            rect_color: Tuple[int, int, int] = (0, 255, 0),
-            rect_thickness: int = 2,
-            show_confidence: bool = True,
-            font_scale: float = 0.6
     ) -> None:
         """
-        显示带检测结果的帧画面（支持多种绘制选项）
+        显示带检测结果的帧画面
 
         参数:
             frame: 输入图像帧 (BGR格式)
             results: 检测结果列表
             draw_rect: 是否绘制检测框 (默认True)
-            confidence_threshold: 置信度阈值 (默认0.5)
             window_name: 显示窗口名称 (默认"Detection")
-            rect_color: 框线颜色 (BGR格式，默认绿色)
-            rect_thickness: 框线粗细 (像素，默认2)
-            show_confidence: 是否显示置信度 (默认True)
-            font_scale: 字体大小 (默认0.6)
 
         返回:
             None: 直接显示图像窗口
@@ -111,45 +101,9 @@ class VideoStream:
         display_frame = frame.copy()
 
         if draw_rect and results:
-            boxes = []
-            confidences = []
-            class_ids = []
-
-            # 提取有效检测结果
-            for r in results:
-                for box in r.boxes:
-                    conf = box.conf.item()
-                    if conf > confidence_threshold:
-                        boxes.append(box.xyxy[0].cpu().numpy().astype(int))
-                        confidences.append(conf)
-                        class_ids.append(int(box.cls.item()))
-
-            # 绘制检测框和标签
-            for box, conf, cls_id in zip(boxes, confidences, class_ids):
-                x1, y1, x2, y2 = box
-
-                # 绘制矩形框
-                cv2.rectangle(
-                    display_frame,
-                    (x1, y1), (x2, y2),
-                    color=rect_color,
-                    thickness=rect_thickness
-                )
-
-                # 获取类别名称（兼容不同YOLO版本）
-                class_name = results[0].names[cls_id]
-
-                # 绘制标签和置信度
-                label = f"{class_name}: {conf:.2f}" if show_confidence else class_name
-                cv2.putText(
-                    display_frame,
-                    label,
-                    (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    font_scale,
-                    rect_color,
-                    max(1, int(font_scale * 2))
-                )
+            # 绘制检测结果
+            for result in results:
+                display_frame = result.plot()  # 自动绘制边界框和标签
 
         # 显示图像
         cv2.imshow(window_name, display_frame)
@@ -434,7 +388,7 @@ def main_yolo():
             frame_count += 1
 
             if frame_count % detect_interval == 0:
-                results = model(frame, verbose=False)
+                results = model(frame, stream=True, verbose=False)
 
             # 显示和保存
             stream.show_frame(frame, results, draw_rect=True)

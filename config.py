@@ -17,7 +17,7 @@ from typing import Tuple
 # ==================== 用户可配置参数 ====================
 # 队伍配置
 TEAM: str = ["blue", "red"][0]  # 当前队伍（默认选第一个）
-RESCUE_MODEL = "./models/720.engine"             # 模型文件路径
+RESCUE_MODEL = "./models/322.pt"             # 模型文件路径
 
 # 视频输出配置
 VIDEO_OUTPUT_DIR="./videos" # 视频保存目录
