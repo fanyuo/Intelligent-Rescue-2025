@@ -45,14 +45,14 @@ last_flag_found_ball=False
 last_flag_found_area=False
 last_time = time.time()
 
-
 while running:
+
     # 读取帧
     frame = stream.read_frame()
     frame_count += 1
 
     if frame_count % detect_interval == 0:
-        results = model(frame, verbose=False)
+        results = model(frame, stream=True, verbose=False)
 
     # 每0.5s打印一次当前状态
     if (current_time := time.time()) > last_time + 0.5:
