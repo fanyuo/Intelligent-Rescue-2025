@@ -21,11 +21,11 @@ import cv2
 from ultralytics import YOLO
 import time
 from control import Controller
-from vison import VideoStream,VISION
+from vision import VideoStream,VISION
 from config import label_balls,label_area,RESCUE_MODEL
 
 model = YOLO(str(RESCUE_MODEL))
-# model.to('cuda:0')  # 使用GPU推理
+model.to('cuda:0')  # 使用GPU推理
 
 stream = VideoStream()
 controller = Controller()
@@ -74,9 +74,9 @@ while running:
             if vision.is_ready_to_catch(bcx,bcy):
                 state=1
             else:
-                controller.approach_ball(bcx, bcy) #待写
+                controller.approach_ball(bcx, bcy)
         else:
-            controller.search_ball(speed=10)   # 没找到球，旋转车体进行找球
+            controller.search_ball(speed=6)   # 没找到球，旋转车体进行找球
             last_flag_found_ball=False
 
     # 已找到球，执行抓球
@@ -123,7 +123,7 @@ while running:
                 controller.approach_area(acx,acy)
         # 执行找安全区
         else:
-            controller.search_area(speed=10)  # 没找到球，旋转车体进行找球
+            controller.search_area(speed=7)  # 没找到球，旋转车体进行找球
             last_flag_found_area = False
 
     # 已到达area，执行放球和后续操作
@@ -131,7 +131,7 @@ while running:
         controller.release()
         time.sleep(0.5) #参数待定
 
-        controller.backward(speed=10) #参数待定
+        controller.backward(speed=8) #参数待定
         time.sleep(0.5) #参数待定
 
         state=0

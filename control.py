@@ -8,13 +8,15 @@
 # 修改记录:
 #   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
 #   2025-07-18 v1.0.0 初始版本 重构，增加缓冲区
+#   2025-07-30 v1.0.0 完成approach_ball，approach_area
 # -----------------------------------------------------------------------------
 from uart import UARTController
 import signal
 import time
 import sys
 import atexit
-from config import CATCH_ANGLE,RELEASE_ANGLE,UART_PORT
+from config import CATCH_ANGLE,RELEASE_ANGLE,UART_PORT,DEFAULT_RESOLUTION
+frame_width, frame_height = DEFAULT_RESOLUTION
 
 class Controller(UARTController):
     def __init__(self, port: str = UART_PORT, baudrate: int = 115200):
@@ -59,10 +61,12 @@ class Controller(UARTController):
             # 1. 停止电机（不依赖串口状态）
             if hasattr(self, '_motor_speeds'):
                 self.stop()
+                time.sleep(0.1)
 
             # 2. 复位舵机（不依赖串口状态）
             if hasattr(self, '_servo_angles'):
                 self.release()
+                time.sleep(0.1)
 
             # 3. 关闭串口（严格检查）
             if self._serial_port is not None:
@@ -90,14 +94,14 @@ class Controller(UARTController):
 
     def forward(self, speed: int = 50) -> None:
         """前进"""
-        self.set_motor_speed(1, speed)
-        self.set_motor_speed(2, speed)
+        self.set_motor_speed(1, -speed)
+        self.set_motor_speed(2, -speed)
         self.execute()
 
     def backward(self, speed: int = 50) -> None:
         """后退"""
-        self.set_motor_speed(1, -speed)
-        self.set_motor_speed(2, -speed)
+        self.set_motor_speed(1, speed)
+        self.set_motor_speed(2, speed)
         self.execute()
 
     def left(self, speed: int = 30) -> None:
@@ -134,21 +138,78 @@ class Controller(UARTController):
         self.execute()
         time.sleep(0.3)  # 等待动作完成
 
-    def approach_ball(self,x,y) -> None:
-        pass
+    def approach_ball(self, x, y) -> None:
+        """根据球体位置调整运动方向"""
+        if 275 < y <= 640:
+            #self.stop
+            if x < 210:
+                print(f"球体位于下部左侧区域: 位置({x:.1f}, {y:.1f})")
+                self.left(5)
+            elif x > 382:
+                print(f"球体位于下部右侧区域: 位置({x:.1f}, {y:.1f})")
+                self.right(5)
+            else:
+                print(f"球体位于下部中间区域: 位置({x:.1f}, {y:.1f})")
+                self.forward(5)
+        elif 160 < y <= 300:
+            #self.stop
+            if x < 210:
+                print(f"球体位于中部左侧区域: 位置({x:.1f}, {y:.1f})")
+                self.left(6)
+            elif x > 382:
+                print(f"球体位于中部右侧区域: 位置({x:.1f}, {y:.1f})")
+                self.right(6)
+            else:
+                print(f"球体位于中部中间区域: 位置({x:.1f}, {y:.1f})")
+                self.forward(6)
+        elif y <= 160:
+            #time.sleep(0.3)
+            if x < 140:
+                print(f"球体位于上部左侧区域: 位置({x:.1f}, {y:.1f})")
+                self.left(8)
+            elif x > 500:
+                print(f"球体位于上部右侧区域: 位置({x:.1f}, {y:.1f})")
+                self.right(8)
+            else:
+                print(f"球体位于上部中间区域: 位置({x:.1f}, {y:.1f})")
+                self.forward(8)
 
-    def approach_area(self,x,y) -> None:
-        pass
+    def approach_area(self, x, y) -> None:
+        """根据目标区域位置调整运动方向"""
+        if 480 < y <= 640:
+            print(f"目标位于上部区域: 位置({x:.1f}, {y:.1f})")
+            if x < 110:
+                self.left(8)
+            elif x > 530:
+                self.right(8)
+            else:
+                self.forward(8)
+        elif 160 < y <= 480:
+            print(f"目标位于中部区域: 位置({x:.1f}, {y:.1f})")
+            if x < 140:
+                self.left(8)
+            elif x > 500:
+                self.right(8)
+            else:
+                self.forward(8)
+        elif y <= 160:
+            print(f"目标位于下部区域: 位置({x:.1f}, {y:.1f})")
+            if x < 160:
+                self.left(8)
+            elif x > 480:
+                self.right(8)
+            else:
+                self.forward(8)
 
-    def search_ball(self, speed = 30) -> None:
+    def search_ball(self, speed) -> None:
         """搜索球体"""
         self.left(speed)
-        self.stop()
 
-    def search_area(self, speed = 30) -> None:
+
+    def search_area(self, speed) -> None:
         """搜索区域"""
         self.right(speed)
-        self.stop()
+
 
 
 # ===================== 测试程序 =====================

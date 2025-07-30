@@ -17,7 +17,7 @@ from typing import Tuple
 # ==================== 用户可配置参数 ====================
 # 队伍配置
 TEAM: str = ["blue", "red"][0]  # 当前队伍（默认选第一个）
-RESCUE_MODEL = "./models/720.engine"             # 模型文件路径
+RESCUE_MODEL = "./models/resecure2025.pt"             # 模型文件路径
 
 # 视频输出配置
 VIDEO_OUTPUT_DIR="./videos" # 视频保存目录
@@ -31,12 +31,12 @@ CATCH_AREA: Tuple[int, int, int, int] = (180, 320, 460, 480)
 READY_AREA: Tuple[int, int, int, int] = (160, 320, 480, 480)
 
 # 舵机角度设置 ----------------> 舵机1和2的角度
-CATCH_ANGLE: Tuple[int, int] = (10,10)
+CATCH_ANGLE: Tuple[int, int] = (70,2900)
 RELEASE_ANGLE: Tuple[int, int] = (90,90)
 
 # 串口设备口
-# UART_PORT: str = "/dev/ttyUSB0"
-UART_PORT: str = "COM9"
+UART_PORT: str = "/dev/ttyUSB0"
+#UART_PORT: str = "COM9"
 
 # ==================== 内部数据处理 ====================
 _origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"]
