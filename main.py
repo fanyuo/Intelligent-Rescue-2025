@@ -30,7 +30,7 @@ import numpy as np
 from control import Controller
 from vision import VideoStream, VISION
 from config import label_balls, label_area, RESCUE_MODEL, DEFAULT_RESOLUTION, HOLDING_AREA, CENTER_REGION, READY_AREA, \
-    CATCH_AREA, CROSS_CENTER_REGION
+    CATCH_AREA, CROSS_CENTER_REGION, TEAM
 
 model = YOLO(str(RESCUE_MODEL))
 model.to('cuda:0')  # 使用GPU推理
@@ -60,10 +60,7 @@ running = True
 last_flag_found_ball = False
 last_flag_found_area = False
 last_time = time.time()
-MAX_STATE3_DURATION = 15  # 状态3最大持续时间
-# 追踪球的消失
-ball_disappear_counter = 0
-
+first_catch = True  # 标记是否是第一次抓取
 # 追踪爪子状态
 claw_state = "open"  # "open"或"close"
 
@@ -91,6 +88,24 @@ def is_ball_in_holding_area(ball_center):
 
 
 while running:
+    # 不断从串口读取cmd的值
+    # 按键1 -> 0 -> 暂停状态
+    # 按键2 -> 1 -> 运行状态
+    # 按键3 -> 2 -> 重置状态，注意重置后需要手动按下按键1进入运行状态
+    cmd = controller.get_latest_cmd()
+    # print("接收命令: 0x{:02X}".format(cmd))
+
+    if cmd == 0xAA:  # 暂停状态
+        controller.stop()
+        continue
+    elif cmd == 0xBB:  # 运行状态
+        pass
+    elif cmd == 0xCC:  # 重置状态
+        controller.stop()
+        controller.release()
+        state = 0
+        continue
+
     # 读取帧
     frame = stream.read_frame()
     frame_count += 1
@@ -126,7 +141,7 @@ while running:
             if not last_flag_found_ball:
                 last_flag_found_ball = True
                 controller.stop()
-                ball_disappear_counter = 0  # 重置消失计数器
+                # ball_disappear_counter = 0  # 重置消失计数器
 
             # 解包ball_data获取坐标数据等
             bcx, bcy = ball_data['center']
@@ -137,11 +152,11 @@ while running:
             else:
                 controller.approach_ball(bcx, bcy)
         else:
-            controller.search_ball(speed=1500)  # 没找到球，旋转车体进行找球
+            controller.search_ball(speed=1200)  # 没找到球，旋转车体进行找球
             last_flag_found_ball = False
 
             # 增加消失计数
-            ball_disappear_counter += 1
+            # ball_disappear_counter += 1
 
     # 已找到球，执行抓球
     if state == 1:
@@ -168,6 +183,26 @@ while running:
                 ball_in_position = False
 
             if ball_in_position:
+                # 第一次抓取时需要检查颜色
+                if first_catch:
+                    expected_color = "Blue_Ball" if TEAM == "blue" else "Red_Ball"
+                    if current_ball_data['label'] != expected_color:
+                        print(f"错误：抓到的是{current_ball_data['label']}而不是{expected_color}，释放并重新寻找")
+                        controller.release()
+                        controller.right(3000)
+                        time.sleep(0.3)
+                        controller.backward(1000)
+                        time.sleep(0.5)
+                        claw_state = "open"
+                        first_catch = True  # 保持为第一次抓取状态
+                        state = 0  # 返回状态0
+                        start_time = None
+                        continue  # 跳过后续处理
+
+                    # 第一次抓取成功且颜色正确
+                    first_catch = False  # 标记第一次抓取完成
+
+                # 进入状态2
                 print("抓取成功(球在HOLDING_AREA内)，进入状态2")
                 start_time = None
                 state = 2

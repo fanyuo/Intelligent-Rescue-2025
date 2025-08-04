@@ -16,7 +16,7 @@ from typing import Tuple
 
 # ==================== 用户可配置参数 ====================
 # 队伍配置
-TEAM: str = ["blue", "red"][0]  # 当前队伍（默认选第一个）
+TEAM: str = ["blue", "red"][1]  # 当前队伍（默认选第一个）
 RESCUE_MODEL = "./models/resecure2025.pt"             # 模型文件路径
 
 # 视频输出配置
@@ -28,7 +28,7 @@ DEFAULT_RESOLUTION: Tuple[int, int] = (640, 480)  # 默认分辨率
 
 # 区域坐标设置 -----------------------------> x1 y1 x2 y2
 # 抓取区域 - 爪子能够成功抓取球体的区域
-CATCH_AREA: Tuple[int, int, int, int] = (170, 430, 480, 460)
+CATCH_AREA: Tuple[int, int, int, int] = (165, 430, 485, 460)
 
 # 准备区域 - 开始执行靠近球体的区域
 READY_AREA: Tuple[int, int, int, int] = (160, 178, 480, 388)
@@ -50,9 +50,8 @@ UART_PORT: str = "/dev/ttyUSB0"
 #UART_PORT: str = "COM9"
 
 # ==================== 内部数据处理 ====================
-_origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"]
+_origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_Ball"]
 _origin_label_area = ["Blue_Placement_Zone", "Red_Placement_Zone"]
-CROSS_MARK_LABEL = "Cross_Mark"  # 十字标记标签
 _ball_filter = {"blue": "Red_Ball", "red": "Blue_Ball"}
 _area_filter = {"blue": "Red_Placement_Zone", "red": "Blue_Placement_Zone"}
 

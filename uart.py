@@ -199,8 +199,9 @@ class UARTController:
 
 # ==============================测试程序==============================
 def main1():
-    packet = UARTController._build_pack(50,-50,100,100)
+    packet = UARTController._build_pack(50, -50, 100, 100)
     print("数据包:\n", packet.hex(' ').upper())
+
 
 def main2():
     import glob
@@ -241,7 +242,7 @@ def main2():
                 print(f"{i}: {port}")
 
             # 手动选择串口
-            selected_port=None
+            selected_port = None
             while True:
                 try:
                     choice = int(input("请选择要连接的串口编号: "))
@@ -370,6 +371,7 @@ def main2():
 
     main_menu()
 
+
 def main3():
     import glob
     import sys
@@ -432,16 +434,15 @@ def main3():
                 print(f"连接失败: {e}")
                 continue  # 返回菜单重新选择
 
-            """
             # 主控制循环
             while True:
                 cmd = controller.get_latest_cmd()
                 print("接收命令: 0x{:02X}".format(cmd))
-            """
 
     main_menu()
 
+
 if __name__ == '__main__':
-    #main1()
-    main2()
-    # main3() #只接收串口数据
+    # main1()
+    # main2()
+    main3()  # 只接收串口数据

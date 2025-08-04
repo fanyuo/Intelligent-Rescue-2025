@@ -597,7 +597,7 @@ def main_yolo():
     # 初始化视觉系统
     vision = VISION(
         model=model,
-        label_balls=["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"],
+        label_balls=["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_Ball"],
         label_area=["Blue_Placement_Zone", "Red_Placement_Zone"],
         team=TEAM,
         ball_filter=_ball_filter,
