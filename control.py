@@ -15,8 +15,10 @@ import signal
 import time
 import sys
 import atexit
-from config import CATCH_ANGLE,RELEASE_ANGLE,UART_PORT,DEFAULT_RESOLUTION
+from config import CATCH_ANGLE, RELEASE_ANGLE, UART_PORT, DEFAULT_RESOLUTION
+
 frame_width, frame_height = DEFAULT_RESOLUTION
+
 
 class Controller(UARTController):
     def __init__(self, port: str = UART_PORT, baudrate: int = 115200):
@@ -55,7 +57,7 @@ class Controller(UARTController):
         """线程安全的关闭方法"""
         if self.flag_cleanup:
             return
-        self.flag_cleanup=True
+        self.flag_cleanup = True
         print("\n执行安全复位协议...")
         try:
             # 1. 停止电机（不依赖串口状态）
@@ -92,28 +94,28 @@ class Controller(UARTController):
         super().close()
         self._safe_shutdown()
 
-    def forward(self, speed: int = 50) -> None:
+    def forward(self, speed) -> None:
         """前进"""
         self.set_motor_speed(1, -speed)
         self.set_motor_speed(2, -speed)
         self.execute()
 
-    def backward(self, speed: int = 50) -> None:
+    def backward(self, speed) -> None:
         """后退"""
         self.set_motor_speed(1, speed)
         self.set_motor_speed(2, speed)
         self.execute()
 
-    def left(self, speed: int = 30) -> None:
+    def left(self, speed) -> None:
         """左转"""
-        self.set_motor_speed(1, speed)
-        self.set_motor_speed(2, -speed)
-        self.execute()
-
-    def right(self, speed: int = 30) -> None:
-        """右转"""
         self.set_motor_speed(1, -speed)
         self.set_motor_speed(2, speed)
+        self.execute()
+
+    def right(self, speed) -> None:
+        """右转"""
+        self.set_motor_speed(1, speed)
+        self.set_motor_speed(2, -speed)
         self.execute()
 
     def stop(self) -> None:
@@ -123,7 +125,7 @@ class Controller(UARTController):
         self.execute()
 
     # 舵机爪子张开和闭合的角度去config.py里调整，不要在这里调整
-    def catch(self, angle1 = CATCH_ANGLE[0], angle2 = CATCH_ANGLE[1]) -> None:
+    def catch(self, angle1=CATCH_ANGLE[0], angle2=CATCH_ANGLE[1]) -> None:
         """执行抓取动作"""
         self.set_servo_angle(1, angle1)
         self.set_servo_angle(2, angle2)
@@ -131,85 +133,321 @@ class Controller(UARTController):
         time.sleep(0.3)  # 等待动作完成
 
     # 舵机爪子张开和闭合的角度去config.py里调整，不要在这里调整
-    def release(self, angle1 = RELEASE_ANGLE[0], angle2 = RELEASE_ANGLE[1]) -> None:
+    def release(self, angle1=RELEASE_ANGLE[0], angle2=RELEASE_ANGLE[1]) -> None:
         """执行释放动作"""
         self.set_servo_angle(1, angle1)
         self.set_servo_angle(2, angle2)
         self.execute()
         time.sleep(0.3)  # 等待动作完成
 
+    def start_catch(self, angle1=CATCH_ANGLE[0], angle2=CATCH_ANGLE[1]) -> None:
+        """执行抓取动作"""
+        self.set_servo_angle(1, 90)
+        self.execute()
+        time.sleep(0.3)  # 等待动作完成
+        self.set_servo_angle(1, 0)
+        self.execute()
+        time.sleep(0.3)  # 等待动作完成
+
+    def approach_cross(self, x, y) -> None:
+        Kp = 0.12  # 比例系数,与响应速度成正比
+        Ki = 0.001  # 积分系数，与消除误差速度成正比
+        Kd = 0.03  # 微分系数，抑制震荡效果
+
+        # 图像中心坐标
+        center_x = 320
+        center_y = frame_height / 2
+
+        # 计算球在水平方向上的偏移量（误差）
+        error_x = x - center_x
+
+        # 计算速度比例因子（0-1之间），基于垂直位置
+        if y > (frame_height * 0.75):  # 底部区域（靠近）
+            base_speed = 4.0
+            speed_factor = 0.5
+            turn_factor = 1.0
+        elif y > (frame_height * 0.5):  # 中部区域
+            base_speed = 4.0
+            speed_factor = 0.7
+            turn_factor = 1.5
+        else:  # 顶部区域（远离）
+            base_speed = 5.5
+            speed_factor = 1.0
+            turn_factor = 2.0
+
+        # 初始化或更新 PID 状态
+        if not hasattr(self, '_pid_integral'):
+            self._pid_integral = 0.0
+            self._pid_last_error = 0.0
+            self._pid_last_time = time.time()
+
+        # 计算时间差
+        current_time = time.time()
+        dt = current_time - self._pid_last_time
+        self._pid_last_time = current_time
+
+        # 比例项
+        P = Kp * error_x
+
+        # 积分项（防止积分饱和）
+        self._pid_integral += error_x * dt
+        # 积分限幅
+        I = Ki * min(max(self._pid_integral, -100), 100)
+
+        # 微分项
+        derivative = (error_x - self._pid_last_error) / dt if dt > 0 else 0
+        D = Kd * derivative
+        self._pid_last_error = error_x
+
+        # PID 总输出
+        pid_output = P + I + D
+
+        # 限幅处理，确保输出在合理范围内
+        max_correction = base_speed * 0.8  # 最大修正量为基速的80%
+        correction = max(min(pid_output, max_correction), -max_correction)
+
+        # 调整两侧电机速度实现精确转向
+        left_speed = base_speed + correction
+        right_speed = base_speed - correction
+
+        # 应用速度因子
+        left_speed *= speed_factor
+        right_speed *= speed_factor
+
+        # 将速度转换为两位整数+两位小数的形式
+        left_speed_formatted = int(left_speed * 100)
+        right_speed_formatted = int(right_speed * 100)
+
+        # 确保最低速度不低于400（绝对值）
+        min_speed = 400  # 4.00
+
+        # 处理左轮速度
+        if abs(left_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if left_speed_formatted >= 0:
+                left_speed_formatted = min_speed
+            else:
+                left_speed_formatted = -min_speed
+
+        # 处理右轮速度
+        if abs(right_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if right_speed_formatted >= 0:
+                right_speed_formatted = min_speed
+            else:
+                right_speed_formatted = -min_speed
+
+        # 设置电机速度
+        self.set_motor_speed(1, -left_speed_formatted)
+        self.set_motor_speed(2, -right_speed_formatted)
+
+        self.execute()
+
     def approach_ball(self, x, y) -> None:
-        """根据球体位置调整运动方向"""
-        if 275 < y <= 640:
-            #self.stop
-            if x < 210:
-                print(f"球体位于下部左侧区域: 位置({x:.1f}, {y:.1f})")
-                self.left(5)
-            elif x > 382:
-                print(f"球体位于下部右侧区域: 位置({x:.1f}, {y:.1f})")
-                self.right(5)
+        """根据球体位置调整运动方向，使用PID控制实现精确转向"""
+        Kp = 0.15  # 比例系数,与响应速度成正比
+        Ki = 0.001  # 积分系数，与消除误差速度成正比
+        Kd = 0.03  # 微分系数，抑制震荡效果
+
+        # 图像中心坐标
+        center_x = 320
+        center_y = frame_height / 2
+
+        # 计算球在水平方向上的偏移量（误差）
+        error_x = x - center_x
+
+        # 计算速度比例因子（0-1之间），基于垂直位置
+        if y > (frame_height * 0.75):  # 底部区域（靠近）
+            base_speed = 4.0
+            speed_factor = 0.5
+            turn_factor = 1.0
+        elif y > (frame_height * 0.5):  # 中部区域
+            base_speed = 4.0
+            speed_factor = 0.7
+            turn_factor = 1.5
+        else:  # 顶部区域（远离）
+            base_speed = 5.5
+            speed_factor = 1.0
+            turn_factor = 2.0
+
+        # 初始化或更新 PID 状态
+        if not hasattr(self, '_pid_integral'):
+            self._pid_integral = 0.0
+            self._pid_last_error = 0.0
+            self._pid_last_time = time.time()
+
+        # 计算时间差
+        current_time = time.time()
+        dt = current_time - self._pid_last_time
+        self._pid_last_time = current_time
+
+        # 比例项
+        P = Kp * error_x
+
+        # 积分项（防止积分饱和）
+        self._pid_integral += error_x * dt
+        # 积分限幅
+        I = Ki * min(max(self._pid_integral, -100), 100)
+
+        # 微分项
+        derivative = (error_x - self._pid_last_error) / dt if dt > 0 else 0
+        D = Kd * derivative
+        self._pid_last_error = error_x
+
+        # PID 总输出
+        pid_output = P + I + D
+
+        # 限幅处理，确保输出在合理范围内
+        max_correction = base_speed * 0.8  # 最大修正量为基速的80%
+        correction = max(min(pid_output, max_correction), -max_correction)
+
+        # 调整两侧电机速度实现精确转向
+        left_speed = base_speed + correction
+        right_speed = base_speed - correction
+
+        # 应用速度因子
+        left_speed *= speed_factor
+        right_speed *= speed_factor
+
+        # 将速度转换为两位整数+两位小数的形式
+        left_speed_formatted = int(left_speed * 100)
+        right_speed_formatted = int(right_speed * 100)
+
+        # 确保最低速度不低于400（绝对值）
+        min_speed = 400  # 4.00
+
+        # 处理左轮速度
+        if abs(left_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if left_speed_formatted >= 0:
+                left_speed_formatted = min_speed
             else:
-                print(f"球体位于下部中间区域: 位置({x:.1f}, {y:.1f})")
-                self.forward(5)
-        elif 160 < y <= 300:
-            #self.stop
-            if x < 210:
-                print(f"球体位于中部左侧区域: 位置({x:.1f}, {y:.1f})")
-                self.left(6)
-            elif x > 382:
-                print(f"球体位于中部右侧区域: 位置({x:.1f}, {y:.1f})")
-                self.right(6)
+                left_speed_formatted = -min_speed
+
+        # 处理右轮速度
+        if abs(right_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if right_speed_formatted >= 0:
+                right_speed_formatted = min_speed
             else:
-                print(f"球体位于中部中间区域: 位置({x:.1f}, {y:.1f})")
-                self.forward(6)
-        elif y <= 160:
-            #time.sleep(0.3)
-            if x < 140:
-                print(f"球体位于上部左侧区域: 位置({x:.1f}, {y:.1f})")
-                self.left(8)
-            elif x > 500:
-                print(f"球体位于上部右侧区域: 位置({x:.1f}, {y:.1f})")
-                self.right(8)
-            else:
-                print(f"球体位于上部中间区域: 位置({x:.1f}, {y:.1f})")
-                self.forward(8)
+                right_speed_formatted = -min_speed
+
+        # 设置电机速度
+        self.set_motor_speed(1, -left_speed_formatted)
+        self.set_motor_speed(2, -right_speed_formatted)
+
+        # 记录调试信息
+        if pid_output != 0:
+            print(f"PID校正: {correction:.2f} (P:{P:.2f} I:{I:.2f} D:{D:.2f})")
+        print(f"球位置: ({x:.1f}, {y:.1f}) | 左轮: {-left_speed_formatted} | 右轮: {-right_speed_formatted}")
+
+        self.execute()
 
     def approach_area(self, x, y) -> None:
-        """根据目标区域位置调整运动方向"""
-        if 480 < y <= 640:
-            print(f"目标位于上部区域: 位置({x:.1f}, {y:.1f})")
-            if x < 110:
-                self.left(8)
-            elif x > 530:
-                self.right(8)
+        Kp = 0.12  # 比例系数,与响应速度成正比
+        Ki = 0.001  # 积分系数，与消除误差速度成正比
+        Kd = 0.03  # 微分系数，抑制震荡效果
+
+        # 图像中心坐标
+        center_x = 320
+        center_y = frame_height / 2
+
+        # 计算球在水平方向上的偏移量（误差）
+        error_x = x - center_x
+
+        # 计算速度比例因子（0-1之间），基于垂直位置
+        if y > (frame_height * 0.75):  # 底部区域（靠近）
+            base_speed = 4.0
+            speed_factor = 0.5
+            turn_factor = 1.0
+        elif y > (frame_height * 0.5):  # 中部区域
+            base_speed = 4.0
+            speed_factor = 0.7
+            turn_factor = 1.5
+        else:  # 顶部区域（远离）
+            base_speed = 5.5
+            speed_factor = 1.0
+            turn_factor = 2.0
+
+        # 初始化或更新 PID 状态
+        if not hasattr(self, '_pid_integral'):
+            self._pid_integral = 0.0
+            self._pid_last_error = 0.0
+            self._pid_last_time = time.time()
+
+        # 计算时间差
+        current_time = time.time()
+        dt = current_time - self._pid_last_time
+        self._pid_last_time = current_time
+
+        # 比例项
+        P = Kp * error_x
+
+        # 积分项（防止积分饱和）
+        self._pid_integral += error_x * dt
+        # 积分限幅
+        I = Ki * min(max(self._pid_integral, -100), 100)
+
+        # 微分项
+        derivative = (error_x - self._pid_last_error) / dt if dt > 0 else 0
+        D = Kd * derivative
+        self._pid_last_error = error_x
+
+        # PID 总输出
+        pid_output = P + I + D
+
+        # 限幅处理，确保输出在合理范围内
+        max_correction = base_speed * 0.8  # 最大修正量为基速的80%
+        correction = max(min(pid_output, max_correction), -max_correction)
+
+        # 调整两侧电机速度实现精确转向
+        left_speed = base_speed + correction
+        right_speed = base_speed - correction
+
+        # 应用速度因子
+        left_speed *= speed_factor
+        right_speed *= speed_factor
+
+        # 将速度转换为两位整数+两位小数的形式
+        left_speed_formatted = int(left_speed * 100)
+        right_speed_formatted = int(right_speed * 100)
+
+        # 确保最低速度不低于400（绝对值）
+        min_speed = 400  # 4.00
+
+        # 处理左轮速度
+        if abs(left_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if left_speed_formatted >= 0:
+                left_speed_formatted = min_speed
             else:
-                self.forward(8)
-        elif 160 < y <= 480:
-            print(f"目标位于中部区域: 位置({x:.1f}, {y:.1f})")
-            if x < 140:
-                self.left(8)
-            elif x > 500:
-                self.right(8)
+                left_speed_formatted = -min_speed
+
+        # 处理右轮速度
+        if abs(right_speed_formatted) < min_speed:
+            # 保持方向但确保最小速度
+            if right_speed_formatted >= 0:
+                right_speed_formatted = min_speed
             else:
-                self.forward(8)
-        elif y <= 160:
-            print(f"目标位于下部区域: 位置({x:.1f}, {y:.1f})")
-            if x < 160:
-                self.left(8)
-            elif x > 480:
-                self.right(8)
-            else:
-                self.forward(8)
+                right_speed_formatted = -min_speed
+
+        # 设置电机速度
+        self.set_motor_speed(1, -left_speed_formatted)
+        self.set_motor_speed(2, -right_speed_formatted)
+
+        self.execute()
+
+    def search_cross(self, speed) -> None:
+        "搜索十字"
+        self.left(speed)
 
     def search_ball(self, speed) -> None:
         """搜索球体"""
         self.left(speed)
 
-
     def search_area(self, speed) -> None:
         """搜索区域"""
         self.right(speed)
-
 
 
 # ===================== 测试程序 =====================
@@ -221,31 +459,32 @@ def main1():
     time.sleep(1)
 
     print("前进")
-    controller.forward(50)
+    controller.forward(1200)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
     print("后退")
-    controller.backward(50)
+    controller.backward(1200)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
     print("左转")
-    controller.left(50)
+    controller.left(1200)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
     print("右转")
-    controller.right(50)
+    controller.right(1200)
     time.sleep(3)
     controller.stop()
     time.sleep(1)
 
     controller.close()
     print("电机测试完毕\n")
+
 
 # 舵机测试
 def main2():
@@ -268,6 +507,7 @@ def main2():
 
     controller.close()
     print("舵机测试完毕\n")
+
 
 if __name__ == '__main__':
     main1()

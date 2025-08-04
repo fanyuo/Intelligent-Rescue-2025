@@ -27,12 +27,23 @@ DEFAULT_FPS: int = 30  # 默认帧率
 DEFAULT_RESOLUTION: Tuple[int, int] = (640, 480)  # 默认分辨率
 
 # 区域坐标设置 -----------------------------> x1 y1 x2 y2
-CATCH_AREA: Tuple[int, int, int, int] = (180, 320, 460, 480)
-READY_AREA: Tuple[int, int, int, int] = (160, 320, 480, 480)
+# 抓取区域 - 爪子能够成功抓取球体的区域
+CATCH_AREA: Tuple[int, int, int, int] = (170, 430, 480, 460)
+
+# 准备区域 - 开始执行靠近球体的区域
+READY_AREA: Tuple[int, int, int, int] = (160, 178, 480, 388)
+
+# 持球区域 - 成功抓取后球体应处的位置
+HOLDING_AREA: Tuple[int, int, int, int] = (270, 380, 410, 460)
+
+# 冲刺区域
+CENTER_REGION: Tuple[int, int, int, int] = (250, 208, 390, 348)
+
+CROSS_CENTER_REGION = (170, 430, 480, 460)
 
 # 舵机角度设置 ----------------> 舵机1和2的角度
-CATCH_ANGLE: Tuple[int, int] = (70,2900)
-RELEASE_ANGLE: Tuple[int, int] = (90,90)
+CATCH_ANGLE: Tuple[int, int] = (90,90)
+RELEASE_ANGLE: Tuple[int, int] = (0,0)
 
 # 串口设备口
 UART_PORT: str = "/dev/ttyUSB0"
@@ -41,7 +52,7 @@ UART_PORT: str = "/dev/ttyUSB0"
 # ==================== 内部数据处理 ====================
 _origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_ball"]
 _origin_label_area = ["Blue_Placement_Zone", "Red_Placement_Zone"]
-
+CROSS_MARK_LABEL = "Cross_Mark"  # 十字标记标签
 _ball_filter = {"blue": "Red_Ball", "red": "Blue_Ball"}
 _area_filter = {"blue": "Red_Placement_Zone", "red": "Blue_Placement_Zone"}
 
