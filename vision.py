@@ -4,13 +4,8 @@
 # 文件: vision.py
 # 功能: 视觉处理核心模块
 # 团队: 北京建筑大学工程设计创新中心314工作室
+# 作者: 樊彧，覃启轩
 # 创建日期: 2025-07-05
-# 修改记录:
-#   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
-#   2025-07-05 樊彧 将视觉识别部分整合成类
-#   2025-07-14 樊彧 优化有效球的识别，添加安全区的识别
-#   2025-07-18 樊彧 增加检测框绘制
-#   2025-07-25 更新：从config获取队伍信息和标签过滤器
 # -----------------------------------------------------------------------------
 import cv2
 from typing import Tuple, Optional, Dict, Any, List
@@ -27,11 +22,10 @@ from config import (
     CATCH_AREA,
     READY_AREA,
     HOLDING_AREA,
+    CROSS_CENTER_REGION,
     TEAM,
     _ball_filter,
     _area_filter,
-    CROSS_CENTER_REGION,
-    CROSS_MARK_LABEL
 )
 
 
@@ -208,53 +202,54 @@ class VISION:
         # 根据队伍生成对应的目标标签
         self._generate_target_labels()
 
-    def detect_cross_mark(
-            self,
-            results,
-            min_confidence: Optional[float] = None
-    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
-        """
-        检测十字标记
-
-        参数:
-            results: YOLO检测结果
-            min_confidence: 置信度阈值
-
-        返回:
-            tuple: (是否检测到, 标记信息字典)
-        """
-        min_confidence = self.min_confidence if min_confidence is None else min_confidence
-        cross_box = None
-
-        for result in results:
-            for box in result.boxes:
-                conf = box.conf[0].item()
-                cls = int(box.cls[0].item())
-                label = self.model.names[cls]
-
-                if label == CROSS_MARK_LABEL and conf > min_confidence:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
-                    cross_box = {
-                        'label': label,
-                        'coordinates': (x1, y1, x2, y2),
-                        'center': ((x1 + x2) / 2, (y1 + y2) / 2),
-                        'class_id': cls
-                    }
-        return cross_box is not None, cross_box
+    # def detect_cross_mark(
+    #         self,
+    #         results,
+    #         min_confidence: Optional[float] = None
+    # ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    #     """
+    #     检测十字标记
+    #
+    #     参数:
+    #         results: YOLO检测结果
+    #         min_confidence: 置信度阈值
+    #
+    #     返回:
+    #         tuple: (是否检测到, 标记信息字典)
+    #     """
+    #     min_confidence = self.min_confidence if min_confidence is None else min_confidence
+    #     cross_box = None
+    #
+    #     for result in results:
+    #         for box in result.boxes:
+    #             conf = box.conf[0].item()
+    #             cls = int(box.cls[0].item())
+    #             label = self.model.names[cls]
+    #
+    #             if label == CROSS_MARK_LABEL and conf > min_confidence:
+    #                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().tolist()
+    #                 cross_box = {
+    #                     'label': label,
+    #                     'coordinates': (x1, y1, x2, y2),
+    #                     'center': ((x1+x2)/2, (y1+y2)/2),
+    #                     'class_id': cls
+    #                 }
+    #     return cross_box is not None, cross_box
 
     def is_cross_in_position(self, cross_center: Tuple[float, float]) -> bool:
         """
         检查十字标记是否在指定区域
-
+        
         参数:
             cross_center: 十字标记中心坐标 (x, y)
-
+            
         返回:
             bool: 是否在指定区域内
         """
         x, y = cross_center
         x1, y1, x2, y2 = CROSS_CENTER_REGION
         return x1 <= x <= x2 and y1 <= y <= y2
+
 
     def detect_avoid_ball(
             self,

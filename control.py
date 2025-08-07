@@ -4,11 +4,8 @@
 # 文件: control.py
 # 功能: 运动控制核心模块
 # 团队: 北京建筑大学工程设计创新中心314工作室
+# 作者: 樊彧，覃启轩
 # 创建日期: 2025-07-05
-# 修改记录:
-#   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
-#   2025-07-18 v1.0.0 初始版本 重构，增加缓冲区
-#   2025-07-30 v1.0.0 完成approach_ball，approach_area
 # -----------------------------------------------------------------------------
 from uart import UARTController
 import signal
@@ -84,7 +81,30 @@ class Controller(UARTController):
         """信号中断处理"""
         print(f"\n捕获到中断信号 {signum}，紧急停止...")
         self._safe_shutdown()
+
         sys.exit(1)
+
+    def execute(self):
+        """执行操作并自动处理连接异常"""
+        MAX_RETRIES = 3  # 最大重试次数
+        RETRY_DELAY = 0.5  # 重试延迟(秒)
+
+        try:
+            super().execute()
+        except Exception as e:
+            print(f"[WARN] 执行失败: {str(e)}")
+            for attempt in range(MAX_RETRIES):
+                try:
+                    time.sleep(RETRY_DELAY)
+                    self.__init__(self.port, self.baudrate)
+                    print(f"[INFO] 第{attempt + 1}次重连成功")
+                    return True
+                except Exception as e:
+                    print(f"[WARN] 第{attempt + 1}次重连失败: {str(e)}")
+                    if attempt == MAX_RETRIES - 1:
+                        print("[ERR] 达到最大重试次数")
+                        return False
+            return False
 
     def __del__(self):
         """对象销毁时自动复位"""

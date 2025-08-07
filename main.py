@@ -1,24 +1,15 @@
-# !/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # -----------------------------------------------------------------------------
 # 文件: main.py
 # 功能: 工程实践与创新能力大赛智能救援赛项
 # 团队: 北京建筑大学工程设计创新中心314工作室
+# 作者: 樊彧，覃启轩
 # 创建日期: 2025-07-04
-# 修改记录:
-#   2025-07-05 v1.0.0 初始版本 樊彧创建并完成基本架构编写
-#   2025-07-05 樊彧 优化了算法结构
-#   2025-07-31 补充：
-#       1. 当识别到中部中间区域存在大于3个球时执行特殊动作
-#       2. state1时检测球是否仍然存在
-#       3. state3时针对中部中间区域的特殊处理
-#       4. state2时实时检测球体位置
-#   2025-08-01 修复：确保返回state0时爪子松开
 # -----------------------------------------------------------------------------
 """
 状态机说明:
 state 0: 执行寻找球
-state 1: 已找到球，执行抓球
+state 1: 已找到球，执行抓取
 state 2: 已抓到球，执行寻找area
 state 3: 已找到area，执行放球和后续操作
 """
@@ -26,7 +17,6 @@ state 3: 已找到area，执行放球和后续操作
 import cv2
 from ultralytics import YOLO
 import time
-import numpy as np
 from control import Controller
 from vision import VideoStream, VISION
 from config import label_balls, label_area, RESCUE_MODEL, DEFAULT_RESOLUTION, HOLDING_AREA, CENTER_REGION, READY_AREA, \
@@ -42,13 +32,11 @@ vision = VISION(model, label_balls, label_area)
 frame_width, frame_height = DEFAULT_RESOLUTION
 
 # 创建视频窗口
-cv2.namedWindow("Rescue Robot Vision", cv2.WINDOW_NORMAL)
-cv2.resizeWindow("Rescue Robot Vision", frame_width, frame_height)
+# cv2.namedWindow("Rescue Robot Vision", cv2.WINDOW_NORMAL)
+# cv2.resizeWindow("Rescue Robot Vision", frame_width, frame_height)
 
 state: int = 0
-state_list = ["执行寻找球", "已找到球，执行抓球", "已抓到球，执行寻找area", "已找到area，执行放球和后续操作"]
-
-print("准备就绪")
+state_list = ["执行寻找球", "已找到球，执行抓取", "已抓到球，执行寻找area", "已找到area，执行放球和后续操作"]
 
 # 初始化参数
 start_flag = 0
@@ -64,7 +52,6 @@ first_catch = True  # 标记是否是第一次抓取
 # 追踪爪子状态
 claw_state = "open"  # "open"或"close"
 
-
 def is_ball_center_in_area(ball_center, area_box):
     if ball_center is None or area_box is None:
         return False
@@ -72,10 +59,9 @@ def is_ball_center_in_area(ball_center, area_box):
     x, y = ball_center
     ax1, ay1, ax2, ay2 = area_box
 
-    # 检查球中心是否在安全区内
+    # 检查球中心是否在安全区域
     return (ax1 <= x <= ax2 and
             ay1 <= y <= ay2)
-
 
 # 检测球体是否在抓取后位置
 def is_ball_in_holding_area(ball_center):
@@ -86,8 +72,19 @@ def is_ball_in_holding_area(ball_center):
     return (HOLDING_AREA[0] <= x <= HOLDING_AREA[2] and
             HOLDING_AREA[1] <= y <= HOLDING_AREA[3])
 
-
+print("准备就绪")
 while running:
+
+    # 读取帧
+    frame = stream.read_frame()
+    frame_count += 1
+
+    # 处理帧并显示状态
+    display_frame = frame.copy()
+
+    if frame_count % detect_interval == 0:
+        results = model(frame, verbose=False)
+
     # 不断从串口读取cmd的值
     # 按键1 -> 0 -> 暂停状态
     # 按键2 -> 1 -> 运行状态
@@ -105,16 +102,6 @@ while running:
         controller.release()
         state = 0
         continue
-
-    # 读取帧
-    frame = stream.read_frame()
-    frame_count += 1
-
-    # 处理帧并显示状态
-    display_frame = frame.copy()
-
-    if frame_count % detect_interval == 0:
-        results = model(frame, verbose=False)
 
     # 每0.5s打印一次当前状态
     current_time = time.time()
@@ -143,22 +130,22 @@ while running:
                 controller.stop()
                 # ball_disappear_counter = 0  # 重置消失计数器
 
-            # 解包ball_data获取坐标数据等
+            # 解包ball_data获取坐标数据
             bcx, bcy = ball_data['center']
 
-            # 在爪子内，执行抓球
+            # 在爪子内，执行抓取
             if vision.is_ready_to_catch(bcx, bcy):
                 state = 1
             else:
                 controller.approach_ball(bcx, bcy)
         else:
-            controller.search_ball(speed=1200)  # 没找到球，旋转车体进行找球
+            controller.search_ball(speed=1200)  # 没找到球，旋转车体进行寻找
             last_flag_found_ball = False
 
             # 增加消失计数
             # ball_disappear_counter += 1
 
-    # 已找到球，执行抓球
+    # 已找到球，执行抓取
     if state == 1:
 
         flag_found_current, current_ball_data = vision.detect_closest_ball(results)
@@ -203,7 +190,7 @@ while running:
                     first_catch = False  # 标记第一次抓取完成
 
                 # 进入状态2
-                print("抓取成功(球在HOLDING_AREA内)，进入状态2")
+                print("抓取成功(球在HOLDING_AREA)，进入状态2")
                 start_time = None
                 state = 2
             elif elapsed > 2.0:  # 2秒后仍失败则放弃
@@ -253,7 +240,7 @@ while running:
     if state == 3:
         # 超时检查
         if time.time() - state3_start_time > 5:
-            print("状态3超时（8秒），强制松爪后退")
+            print("状态3超时（5秒），强制松爪后退")
             controller.release()
             claw_state = "open"
             controller.backward(1500)
@@ -313,10 +300,9 @@ while running:
         cv2.circle(frame, (int(ball_center[0]), int(ball_center[1])), 10, (0, 0, 255), -1)
 
     # 显示和保存
-    stream.show_frame(frame, results, draw_rect=True)
+    stream.show_frame(frame,results,draw_rect=True)
     stream.save_frame(frame)
-    if cv2.waitKey(1) == ord('q'):
-        break
+    if cv2.waitKey(1) == ord('q'):break
 
 cv2.destroyAllWindows()
 stream.release()

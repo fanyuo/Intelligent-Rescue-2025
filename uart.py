@@ -3,14 +3,9 @@
 # -----------------------------------------------------------------------------
 # 文件: uart.py
 # 功能: 基于UART协议的电机与舵机控制核心模块
-# 作者: 覃启轩
+# 作者: 覃启轩，樊彧
 # 团队: 北京建筑大学工程设计创新中心314工作室
 # 创建日期: 2025-07-05
-# 修改记录:
-#   2025-07-05 v1.0.0 初始版本
-#   2025-07-14 v1.0.0 封装成类，优化算法结构
-#   2025-07-18 v1.0.0 重构，增加缓冲区
-#   2025-08-01 v1.1.0 增加串口数据接收功能（直接覆盖模式）
 # -----------------------------------------------------------------------------
 import serial
 from serial.serialutil import SerialException
@@ -194,14 +189,16 @@ class UARTController:
                 return True
             except SerialException as e:
                 print(f"[ERR] 发送失败: {e}")
+
+          
+
                 return False
 
 
 # ==============================测试程序==============================
 def main1():
-    packet = UARTController._build_pack(50, -50, 100, 100)
+    packet = UARTController._build_pack(50,-50,100,100)
     print("数据包:\n", packet.hex(' ').upper())
-
 
 def main2():
     import glob
@@ -242,7 +239,7 @@ def main2():
                 print(f"{i}: {port}")
 
             # 手动选择串口
-            selected_port = None
+            selected_port=None
             while True:
                 try:
                     choice = int(input("请选择要连接的串口编号: "))
@@ -267,9 +264,6 @@ def main2():
 
             # 主控制循环
             while True:
-                cmd = controller.get_latest_cmd()
-                print("接收命令: 0x{:02X}".format(cmd))
-                continue
                 print("\n===== 控制菜单 =====")
                 print("0. 退出程序并复位")
                 print("1. 控制电机")
@@ -371,7 +365,6 @@ def main2():
 
     main_menu()
 
-
 def main3():
     import glob
     import sys
@@ -434,15 +427,16 @@ def main3():
                 print(f"连接失败: {e}")
                 continue  # 返回菜单重新选择
 
+            
             # 主控制循环
             while True:
                 cmd = controller.get_latest_cmd()
                 print("接收命令: 0x{:02X}".format(cmd))
+            
 
     main_menu()
 
-
 if __name__ == '__main__':
-    # main1()
-    # main2()
-    main3()  # 只接收串口数据
+    #main1()
+    main2()
+    #main3() #只接收串口数据

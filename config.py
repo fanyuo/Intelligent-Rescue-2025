@@ -49,7 +49,7 @@ RELEASE_ANGLE: Tuple[int, int] = (0,0)
 UART_PORT: str = "/dev/ttyUSB0"
 #UART_PORT: str = "COM9"
 
-# ==================== 内部数据处理（无需用户配置） ====================
+# ==================== 内部数据处理 ====================
 _origin_label_balls = ["Red_Ball", "Blue_Ball", "Yellow_Ball", "Black_Ball"]
 _origin_label_area = ["Blue_Placement_Zone", "Red_Placement_Zone"]
 _ball_filter = {"blue": "Red_Ball", "red": "Blue_Ball"}
@@ -66,4 +66,3 @@ def _validate():
 
 # 初始化时自动校验
 _validate()
-
