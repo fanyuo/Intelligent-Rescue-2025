@@ -5,15 +5,34 @@
 
 ## 项目结构
 
-Intelligent-Rescue-2025/  
-├── config.py # 全局配置文件  
-├── control.py # 运动控制核心模块  
-├── main.py # 主程序  
-├── uart.py # 串口通信模块  
-├── vision.py # 视觉处理模块  
-└── README.md # 项目文档
+```plaintext
+Intelligent-Rescue-2025/
+├── LICENSE                  # MIT开源许可证
+├── README.md                # 项目总说明文档
+├── Main-Controller/         # 上位机(Jetson)控制程序
+│   ├── main.py              # 主程序入口
+│   ├── config.py            # 全局配置文件
+│   ├── control.py           # 运动控制核心模块
+│   ├── uart.py              # 串口通信模块
+│   ├── vision.py            # 视觉处理模块
+└── Sub-Controller/          # 下位机(STM32)固件
+    ├── hardware/            # 硬件驱动层
+    │   ├── font.c           # 字体库实现
+    │   ├── font.h           # 字体库头文件
+    │   ├── oled.c           # OLED屏幕驱动
+    │   ├── oled.h           # OLED屏幕驱动头文件
+    │   ├── motor.c          # 电机驱动实现
+    │   ├── motor.h          # 电机驱动头文件
+    │   ├── servo.c          # 舵机驱动实现
+    │   ├── servo.h          # 舵机驱动头文件
+    │   ├── uart.c           # 串口通信实现
+    │   └── uart.h           # 串口通信头文件
+    └── system/              # 系统层
+        ├── callback.c       # 中断回调处理
+        └── callback.h       # 中断回调头文件
+```
 
-## 硬件配置
+## 🛠️ 硬件配置
 
 - **上位机**：Jetson系列开发板
 - **下位机**：STM32F103
@@ -22,20 +41,20 @@ Intelligent-Rescue-2025/
   - 2个舵机（用于抓取机构）
 - **通信方式**：UART串口通信
 
-## 软件依赖
+## 📦 软件依赖
 
+### 上位机依赖
 - Python 3.x
 - OpenCV
 - PyYOLO (ultralytics)
 - PySerial
 - NumPy
 
-安装依赖:  
-```bash
-pip install opencv-python ultralytics pyserial numpy
-```
+### 下位机开发环境
+- STM32CubeMX
+- Keil uVision5
 
-## 配置文件说明 (config.py)
+## ⚙️ 配置文件说明 (config.py)
 
 包含所有可配置参数：
 
