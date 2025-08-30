@@ -30,6 +30,11 @@ Intelligent-Rescue-2025/
 - PySerial
 - NumPy
 
+安装依赖:  
+```bash
+pip install opencv-python ultralytics pyserial numpy
+```
+
 ## 配置文件说明 (config.py)
 
 包含所有可配置参数：
