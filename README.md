@@ -109,5 +109,5 @@ python3 模块名.py
 - 樊彧
 - 覃启轩
 
-## 许可证
-本项目代码开源，遵循MIT许可证。
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
